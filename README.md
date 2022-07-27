@@ -1,4 +1,4 @@
-## **Abstractive text summarization**
+## **Query Focused text summarization**
 
 <br>
 
