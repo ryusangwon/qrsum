@@ -3,3 +3,8 @@ export/
 QMSum/
 data/
 /data/
+/__pycache__/
+/qrencoder/__pycache__
+/qrencoder/*.txt
+/qrencoder/model*
+/qrencoder/output/
