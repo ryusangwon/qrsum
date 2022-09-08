@@ -14,6 +14,8 @@ import torch
 from torch.utils.data.dataset import Dataset
 from transformers import PreTrainedTokenizerBase
 
+import random
+import numpy as np
 
 class MultiEncoderDataset(Dataset):
 
@@ -86,7 +88,7 @@ class MultiEncoderDataset(Dataset):
         return encoding
 
     def _encode_example(self, source, target, query=None):
-
+        # query = mask_query(query)
         output = self.chunk_tokenizer(source, query)
         source_ids = output['input_ids']
         source_attention_mask = output['attention_mask']
@@ -108,7 +110,6 @@ class MultiEncoderDataset(Dataset):
             'labels': target_ids,
             'decoder_attention_mask': tokenized_answer['attention_mask'].squeeze(),
         }
-
 
 class ChunkTokenizer:
     """Chunks and tokenizes input text and optional query for input to multi-encoder model. Does both chunking and
@@ -150,7 +151,9 @@ class ChunkTokenizer:
         Returns:
             dictionary with tokenized chunks
         """
-        if query:
+
+        rand = random.random()
+        if query and rand <= 1:
             prefix = f"<s>{query}</s>"
         else:
             prefix = f"<s>"
@@ -160,7 +163,26 @@ class ChunkTokenizer:
             return_tensors="pt",
             max_length=self.chunk_size,
             truncation=True
-        )['input_ids']
+        )
+
+        """
+        # here
+        """
+        tokenized_query = prefix_tokens
+        rand = torch.rand(tokenized_query.input_ids.shape)
+        mask_arr = (rand < 0.15) * (tokenized_query.input_ids != 101) * (tokenized_query.input_ids != 102) \
+                   * (tokenized_query.input_ids != 0)
+        selection = torch.flatten((mask_arr[0]).nonzero())
+        selection_val = np.random.random(len(selection))  # selection의 위치마다 0~1 값 부여
+        mask_selection = selection[np.where(selection_val >= 0.2)[0]]  # 80% : Mask 토큰 대체
+        random_selection = selection[np.where(selection_val < 0.1)[0]]  # 10% : 랜덤 토큰 대체
+        tokenized_query.input_ids[0, mask_selection] = 103
+        tokenized_query.input_ids[0, random_selection] = torch.randint(0, 30522, size=random_selection.shape)
+        prefix_tokens = tokenized_query["input_ids"]
+        """
+        here
+        """
+
         prefix_len = prefix_tokens.size(-1)
 
         suffix_chunk_size = self.chunk_size - prefix_len
@@ -220,3 +242,17 @@ class ChunkTokenizer:
             "input_ids": torch.cat(chunk_input_ids_all, dim=0),
             "attention_mask": torch.cat(chunk_attention_mask_all, dim=0)
         }
+
+
+def mask_query(self, tokenized_query):
+
+    rand = torch.rand(tokenized_query.input_ids.shpae)
+    mask_arr = (rand < 0.15) * (tokenized_query.input_ids != 101) * (tokenized_query.input_ids != 102) \
+               * (tokenized_query.input_ids != 0)
+    selection = torch.flatten((mask_arr[0]).nonzero())
+    selection_val = np.random.random(len(selection))  # selection의 위치마다 0~1 값 부여
+    mask_selection = selection[np.where(selection_val >= 0.2)[0]]  # 80% : Mask 토큰 대체
+    random_selection = selection[np.where(selection_val < 0.1)[0]]  # 10% : 랜덤 토큰 대체
+    tokenized_query.input_ids[0, mask_selection] = 103
+    tokenized_query.input_ids[0, random_selection] = torch.randint(0, 30522, size=random_selection.shape)
+    return tokenized_query
